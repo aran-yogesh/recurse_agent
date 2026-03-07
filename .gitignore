@@ -1,0 +1,19 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Secrets
+.env
+
+# Review agent output files (gitignored but read by Claude Code)
+CLAUDE.md
+memory.md
+skills.md
+agents.md
