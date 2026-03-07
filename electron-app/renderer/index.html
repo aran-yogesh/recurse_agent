@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- @learn: CSP blocks inline scripts and remote resources — required for Electron security -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline';" />
+  <title>Recurse Agent</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ── App shell ──────────────────────────────────────────────────────────── -->
+  <div id="app">
+
+    <!-- Left: chat column -->
+    <div id="chat-col">
+      <header id="topbar">
+        <span id="app-title">Recurse Agent</span>
+        <!-- Target directory input — pre-filled from .env on load -->
+        <div id="dir-row">
+          <label for="dir-input">dir:</label>
+          <input id="dir-input" type="text" spellcheck="false" placeholder="project directory" />
+        </div>
+      </header>
+
+      <!-- Scrollable message list -->
+      <div id="messages"></div>
+
+      <!-- Pending image preview strip — thumbnails rendered dynamically by app.js -->
+      <div id="image-preview-strip" class="hidden"></div>
+
+      <!-- Composer bar -->
+      <div id="composer">
+        <button id="attach-btn" title="Attach image (or drag & drop / Ctrl+V)">📎</button>
+        <!-- Hidden file input triggered by attach button -->
+        <input id="file-input" type="file" accept="image/*" multiple hidden />
+        <textarea id="text-input" rows="1" placeholder="Type a review or paste an image…"></textarea>
+        <button id="send-btn" title="Send (Enter)">&#8594;</button>
+      </div>
+    </div>
+
+    <!-- Drag handle between chat and sidebar -->
+    <div id="resizer"></div>
+
+    <!-- Right: file viewer sidebar -->
+    <div id="sidebar">
+      <div id="sidebar-tabs">
+        <button class="tab-btn active" data-file="memory.md">memory</button>
+        <button class="tab-btn" data-file="skills.md">skills</button>
+        <button class="tab-btn" data-file="agents.md">agents</button>
+        <button id="refresh-btn" title="Refresh current file">↺</button>
+        <button id="save-btn" title="Save changes">Save</button>
+      </div>
+      <textarea id="file-content" spellcheck="false">Select a tab to view file contents.</textarea>
+    </div>
+
+  </div>
+
+  <!-- @learn: renderer logic lives in app.js; loaded as a module for clean ES6 import support -->
+  <script src="app.js"></script>
+</body>
+</html>

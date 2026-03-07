@@ -1,0 +1,12 @@
+{
+  "name": "recurse-agent-ui",
+  "version": "1.0.0",
+  "description": "Desktop chat UI for the recurse-agent code review tool",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "electron": "^33.0.0"
+  }
+}
