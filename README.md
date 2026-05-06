@@ -1,8 +1,4 @@
-# recurse-agent
 
-Learns from code review screenshots or PR comment text and updates your coding pattern files (`memory.md`, `skills.md`, `agents.md`) automatically.
-
----
 
 ## Prerequisites
 
