@@ -88,10 +88,7 @@ def is_low_signal_body(body: str) -> bool:
         return True
 
     normalized = re.sub(r"[\s.!?]+", " ", stripped.lower()).strip()
-    if normalized in _APPROVAL_PHRASES:
-        return True
-
-    return False
+    return normalized in _APPROVAL_PHRASES
 
 
 def is_low_signal_comment(comment: dict) -> bool:
