@@ -2,7 +2,7 @@ import json
 import operator
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated, TypedDict
+from typing import Annotated, TypedDict, cast
 
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
@@ -32,7 +32,7 @@ from utils.writer import ensure_claude_md, read_md, write_md
 
 MAX_ITERATIONS = 3
 
-_llm = ChatAnthropic(model="claude-opus-4-6", temperature=0)
+_llm = ChatAnthropic(model="claude-opus-4-6", temperature=0)  # type: ignore[call-arg]
 
 
 # ── Pydantic models ───────────────────────────────────────────────────────────
@@ -80,13 +80,17 @@ def extract_feedback(state: AgentState) -> dict:
     """Parse review input into structured feedback. Handles both screenshot and raw text."""
     structured_llm = _llm.with_structured_output(ExtractedFeedback)
 
-    if state.get("review_text"):
+    review_text = state.get("review_text")
+    image_path = state.get("image_path")
+
+    if review_text:
         # Text mode: raw PR comments from GitHub webhook
-        message = HumanMessage(content=extract_from_text_prompt(state["review_text"]))
+        message = HumanMessage(content=extract_from_text_prompt(review_text))
         source_label = "github-pr"
     else:
         # Vision mode: screenshot
-        image_data, media_type = encode_image(state["image_path"])
+        assert image_path is not None, "extract_feedback requires either review_text or image_path"
+        image_data, media_type = encode_image(image_path)
         message = HumanMessage(content=[
             {
                 "type": "image_url",
@@ -94,11 +98,11 @@ def extract_feedback(state: AgentState) -> dict:
             },
             {"type": "text", "text": EXTRACT_USER},
         ])
-        source_label = Path(state["image_path"]).name
+        source_label = Path(image_path).name
 
-    feedback: ExtractedFeedback = structured_llm.invoke(
+    feedback = cast(ExtractedFeedback, structured_llm.invoke(
         [SystemMessage(content=EXTRACT_SYSTEM), message]
-    )
+    ))
 
     return {
         "feedback": feedback,
@@ -110,13 +114,15 @@ def update_files(state: AgentState) -> dict:
     """Write memory.md, skills.md, and agents.md from extracted feedback."""
     target = state["target_dir"]
     feedback = state["feedback"]
+    assert feedback is not None, "update_files runs after extract_feedback; feedback must be set"
     date = datetime.now().strftime("%Y-%m-%d")
-    image_name = Path(state["image_path"]).name if state.get("image_path") else "github-pr"
+    image_path = state.get("image_path")
+    image_name = Path(image_path).name if image_path else "github-pr"
     feedback_json = feedback.model_dump_json(indent=2)
     issues_json = json.dumps([i.model_dump() for i in feedback.issues], indent=2)
 
     def llm_call(system: str, user: str) -> str:
-        return _llm.invoke([SystemMessage(content=system), HumanMessage(content=user)]).content
+        return cast(str, _llm.invoke([SystemMessage(content=system), HumanMessage(content=user)]).content)
 
     write_md(target, "memory.md", llm_call(
         MEMORY_SYSTEM,
@@ -140,16 +146,18 @@ def reflect(state: AgentState) -> dict:
     """Read all three files and decide if a revision pass is needed."""
     target = state["target_dir"]
     iteration = state["iteration"] + 1
+    feedback = state["feedback"]
+    assert feedback is not None, "reflect runs after extract_feedback; feedback must be set"
 
-    result: ReflectionResult = _llm.with_structured_output(ReflectionResult).invoke([
+    result = cast(ReflectionResult, _llm.with_structured_output(ReflectionResult).invoke([
         SystemMessage(content=REFLECT_SYSTEM),
         HumanMessage(content=reflect_prompt(
             read_md(target, "memory.md"),
             read_md(target, "skills.md"),
             read_md(target, "agents.md"),
-            state["feedback"].overall_theme,
+            feedback.overall_theme,
         )),
-    ])
+    ]))
 
     return {
         "reflection": result,
@@ -163,13 +171,15 @@ def reflect(state: AgentState) -> dict:
 def revise(state: AgentState) -> dict:
     """Apply targeted revisions to all files based on reflection feedback."""
     target = state["target_dir"]
-    focus = state["reflection"].focus_areas
+    reflection = state["reflection"]
+    assert reflection is not None, "revise runs after reflect; reflection must be set"
+    focus = reflection.focus_areas
 
     for file_name in ("memory.md", "skills.md", "agents.md"):
-        revised = _llm.invoke([
+        revised = cast(str, _llm.invoke([
             SystemMessage(content=REVISE_SYSTEM),
             HumanMessage(content=revise_prompt(file_name, read_md(target, file_name), focus)),
-        ]).content
+        ]).content)
         write_md(target, file_name, revised)
 
     return {"logs": [f"Revised files — focus: {'; '.join(focus)}"]}
