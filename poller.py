@@ -180,7 +180,7 @@ async def poll_once(client: httpx.AsyncClient, last_event_id: str | None) -> str
 
     for e in new_events:
         body = e.get("payload", {}).get("comment", {}).get("body", "")[:80]
-        log("poll", f"  type={e['type']} repo={e['repo']['name']} body={repr(body)}")
+        log("poll", f"  type={e['type']} repo={e['repo']['name']} body={body!r}")
 
     # Process oldest-first so memory.md stays in chronological order
     for event in reversed(new_events):
@@ -193,7 +193,7 @@ async def poll_once(client: httpx.AsyncClient, last_event_id: str | None) -> str
         body = event.get("payload", {}).get("comment", {}).get("body", "")
 
         if LEARN_TRIGGER not in body:
-            log("poll", f"  Skipping — no '{LEARN_TRIGGER}' in body: {repr(body[:60])}")
+            log("poll", f"  Skipping — no '{LEARN_TRIGGER}' in body: {body[:60]!r}")
             continue
 
         log("poll", f"  '{LEARN_TRIGGER}' matched! Processing...")

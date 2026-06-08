@@ -29,8 +29,8 @@ def main() -> None:
     if args.text:
         # Text mode — no file I/O needed before invoking the agent
         # logging: entry point logged so subprocess output is traceable in Electron UI
-        print(f"\nReview Agent")
-        print(f"  Mode       : text")
+        print("\nReview Agent")
+        print("  Mode       : text")
         print(f"  Target dir : {target_dir}\n")
         logs = run_from_text(args.text, str(target_dir))
     else:
@@ -45,7 +45,7 @@ def main() -> None:
             print(f"Error: screenshot not found: {image_path}", file=sys.stderr)
             sys.exit(1)
 
-        print(f"\nReview Agent")
+        print("\nReview Agent")
         print(f"  Screenshot : {image_path.name}")
         print(f"  Target dir : {target_dir}\n")
 
