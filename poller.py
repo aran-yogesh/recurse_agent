@@ -16,6 +16,7 @@ import httpx
 from dotenv import load_dotenv
 
 from agent import run_from_text
+from utils.filters import is_low_signal_comment
 
 load_dotenv()
 
@@ -69,14 +70,24 @@ async def fetch_all_pr_comments(client: httpx.AsyncClient, repo: str, pr_number:
     log("fetch", f"Found {len(review_comments)} review comment(s), {len(issue_comments)} issue comment(s)")
 
     sections = []
+    skipped = 0
     for c in review_comments:
+        if is_low_signal_comment(c):
+            skipped += 1
+            continue
         author = c["user"]["login"]
         path = c.get("path", "unknown file")
         line = c.get("line") or c.get("original_line", "")
         sections.append(f"Review on `{path}` line {line} by @{author}:\n{c['body']}")
 
     for c in issue_comments:
+        if is_low_signal_comment(c):
+            skipped += 1
+            continue
         sections.append(f"PR comment by @{c['user']['login']}:\n{c['body']}")
+
+    if skipped:
+        log("fetch", f"Filtered {skipped} low-signal comment(s)")
 
     result = "\n\n---\n\n".join(sections)
     log("fetch", f"Total text length: {len(result)} chars")
