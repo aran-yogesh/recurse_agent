@@ -25,6 +25,7 @@ from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 
 from agent import run_from_text
+from utils.filters import is_low_signal_comment
 
 load_dotenv()
 
@@ -77,8 +78,12 @@ async def fetch_pr_comments(client: httpx.AsyncClient, repo: str, pr_number: int
     )
 
     sections = []
+    skipped = 0
 
     for c in review_resp.json():
+        if is_low_signal_comment(c):
+            skipped += 1
+            continue
         author = c["user"]["login"]
         path = c.get("path", "unknown file")
         line = c.get("line") or c.get("original_line", "")
@@ -86,9 +91,15 @@ async def fetch_pr_comments(client: httpx.AsyncClient, repo: str, pr_number: int
         sections.append(f"Review on `{path}` line {line} by @{author}:\n{body}")
 
     for c in issue_resp.json():
+        if is_low_signal_comment(c):
+            skipped += 1
+            continue
         author = c["user"]["login"]
         body = c["body"]
         sections.append(f"PR comment by @{author}:\n{body}")
+
+    if skipped:
+        print(f"[webhook] Filtered {skipped} low-signal comment(s)")
 
     return "\n\n---\n\n".join(sections)
 
