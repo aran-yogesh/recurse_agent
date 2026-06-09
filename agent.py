@@ -1,3 +1,4 @@
+import asyncio
 import json
 import operator
 from datetime import datetime
@@ -106,7 +107,7 @@ def extract_feedback(state: AgentState) -> dict:
     }
 
 
-def update_files(state: AgentState) -> dict:
+async def update_files(state: AgentState) -> dict:
     """Write memory.md, skills.md, and agents.md from extracted feedback."""
     target = state["target_dir"]
     feedback = state["feedback"]
@@ -115,23 +116,30 @@ def update_files(state: AgentState) -> dict:
     feedback_json = feedback.model_dump_json(indent=2)
     issues_json = json.dumps([i.model_dump() for i in feedback.issues], indent=2)
 
-    def llm_call(system: str, user: str) -> str:
-        return _llm.invoke([SystemMessage(content=system), HumanMessage(content=user)]).content
+    memory_msgs = [
+        SystemMessage(content=MEMORY_SYSTEM),
+        HumanMessage(content=memory_update_prompt(
+            read_md(target, "memory.md"), date, image_name, feedback_json
+        )),
+    ]
+    skills_msgs = [
+        SystemMessage(content=SKILLS_SYSTEM),
+        HumanMessage(content=skills_update_prompt(read_md(target, "skills.md"), issues_json)),
+    ]
+    agents_msgs = [
+        SystemMessage(content=AGENTS_SYSTEM),
+        HumanMessage(content=agents_update_prompt(read_md(target, "agents.md"), feedback_json)),
+    ]
 
-    write_md(target, "memory.md", llm_call(
-        MEMORY_SYSTEM,
-        memory_update_prompt(read_md(target, "memory.md"), date, image_name, feedback_json),
-    ))
+    memory_res, skills_res, agents_res = await asyncio.gather(
+        _llm.ainvoke(memory_msgs),
+        _llm.ainvoke(skills_msgs),
+        _llm.ainvoke(agents_msgs),
+    )
 
-    write_md(target, "skills.md", llm_call(
-        SKILLS_SYSTEM,
-        skills_update_prompt(read_md(target, "skills.md"), issues_json),
-    ))
-
-    write_md(target, "agents.md", llm_call(
-        AGENTS_SYSTEM,
-        agents_update_prompt(read_md(target, "agents.md"), feedback_json),
-    ))
+    write_md(target, "memory.md", memory_res.content)
+    write_md(target, "skills.md", skills_res.content)
+    write_md(target, "agents.md", agents_res.content)
 
     return {"logs": ["Updated memory.md, skills.md, agents.md"]}
 
@@ -160,17 +168,22 @@ def reflect(state: AgentState) -> dict:
     }
 
 
-def revise(state: AgentState) -> dict:
+async def revise(state: AgentState) -> dict:
     """Apply targeted revisions to all files based on reflection feedback."""
     target = state["target_dir"]
     focus = state["reflection"].focus_areas
+    file_names = ("memory.md", "skills.md", "agents.md")
 
-    for file_name in ("memory.md", "skills.md", "agents.md"):
-        revised = _llm.invoke([
+    current = {name: read_md(target, name) for name in file_names}
+    results = await asyncio.gather(*[
+        _llm.ainvoke([
             SystemMessage(content=REVISE_SYSTEM),
-            HumanMessage(content=revise_prompt(file_name, read_md(target, file_name), focus)),
-        ]).content
-        write_md(target, file_name, revised)
+            HumanMessage(content=revise_prompt(name, current[name], focus)),
+        ])
+        for name in file_names
+    ])
+    for name, res in zip(file_names, results):
+        write_md(target, name, res.content)
 
     return {"logs": [f"Revised files — focus: {'; '.join(focus)}"]}
 
